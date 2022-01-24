@@ -1,37 +1,57 @@
 import "normalize.css";
 
+import { $, $$, $ce, $h} from './dom-utils.js'
+
 const apiKey = "b0a2dad";
 
 const baseApiUrl = `http://www.omdbapi.com/?apikey=${apiKey}&s=`;
+const detailApiUrl = `http://www.omdbapi.com/?apikey=${apiKey}&i=`;
 
 const imdbUrl = "https://www.imdb.com";
 const imdbTitleUrl = imdbUrl + "/title/";
 
-const $ce = (tag) => document.createElement(tag);
+const fetchJson = url => fetch(url).then(res => res.json())
+
+function projectMediaToRow ({Title, Year, Director, Actors, Writer, imdbID, imdbRating}) {
+  const tds = [
+    Title,
+    Year,
+    Director,
+    Actors,
+    Writer,
+    imdbID,
+    imdbRating,
+  ].map(str => {
+    const td = document.createElement('td')
+    td.innerHTML = str
+    return td
+  })
+  const tr = document.createElement('tr')
+  tr.append(...tds)
+  return tr
+}
+
+const createRowsFromObjects = (objects) => {
+  return objects.map(projectMediaToRow)
+}
 
 function fetchMovies(search) {
   const searchUrl = baseApiUrl + search;
-  console.log("searchUrl");
-  fetch(searchUrl)
-    .then((res) => (console.log(res), res))
-    .then((res) => res.json())
-    .then((data) => (console.log(data), data))
+  fetchJson(searchUrl)
     .then((searchResult) => {
-      const moviesEls = searchResult.Search.map((movie) => {
-        const liEl = $ce("li");
-          $(`<a href="${imdbTitleUrl + movie.imdbID}">`)
-            .append(`${movie.Title} (${movie.Year})`)
-            .appendTo(liEl);
-        return liEl;
+      const movieDetails = searchResult.Search
+        .map((movie) => fetchJson(detailApiUrl + movie.imdbID))
+        return Promise.all(movieDetails)
+      })
+      .then(moviesDetails => {
+        const rows = createRowsFromObjects(moviesDetails)
+        const moviesEl = $("#movies");
+        moviesEl.innerHTML = "";
+        moviesEl.append(...rows);
+      })
+      .catch((error) => {
+        console.error(error);
       });
-      const moviesEl = document.querySelector("#movies");
-      moviesEl.innerHTML = "";
-      moviesEl.append(...moviesEls);
-    })
-    .catch((error) => {
-      console.log("Test");
-      console.error(error);
-    });
 }
 
 document.querySelector("#app").innerHTML = `
@@ -39,56 +59,28 @@ document.querySelector("#app").innerHTML = `
     <label for="search"> Search : </label>
     <input type="text" id="search" name="search">
     <input type="submit" value="Go"/>
+    <label for="filter"> Filter : </label>
+    <input type="text" id="filter" name="filter">
   </form>
-  <ul id="movies"></ul>
+  <table>
+    <caption>Titre du tableau</caption>
+    <thead>
+      <tr>
+        <th>Title</th>
+        <th>Year</th>
+        <th>Director</th>
+        <th>Actors</th>
+        <th>Writers</th>
+        <th>idmdID</th>
+        <th>imdbRating</th>
+      </tr>
+    </thead>
+    <tbody id="movies">
+    </tbody>
+  </table>
 `;
 
-const createElFromHtml = (htmlPart) => {
-  // 1
-  const div = document.createElement("div");
-  // 2
-  div.innerHTML = htmlPart;
-  // 3
-  return div.firstElementChild;
-};
-
-const domProto = {
-  addEvent(eventType, callback) {
-    this.els.forEach((el) => el.addEventListener(eventType, callback));
-  },
-  append(...nodes) {
-    console.log(this.els)
-    this.els.forEach((el) => el.append(...nodes));
-    console.log(this.els);
-    return $(this.els);
-  },
-  appendTo(targetEl) {
-    this.els.forEach((el) => targetEl.append(el));
-    console.log(this.els);
-    return $(this.els);
-  },
-  val() {
-    if (this.els.length === 0) {
-      return null;
-    }
-    return this.els[0].value;
-  }
-};
-
-const $ = (selector) => {
-  const els =
-    typeof selector === "object"
-      ? selector
-      : selector.startsWith("<")
-      ? [createElFromHtml(selector)]
-      : [...document.querySelectorAll(selector)];
-
-  const wrapper = Object.create(domProto)
-  wrapper.els = els
-  return wrapper
-};
-
-$("#search-form").addEvent("submit", (event) => {
+$("#search-form").addEventListener("submit", (event) => {
   event.preventDefault();
-  fetchMovies($("#search").val());
+  fetchMovies($("#search").value);
 });
