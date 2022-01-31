@@ -35,6 +35,15 @@ const createRowsFromObjects = (objects) => {
   return objects.map(projectMediaToRow)
 }
 
+let moviesList = []
+
+function createHtmlFromList(movies) {
+  const rows = createRowsFromObjects(movies)
+  const moviesEl = $("#movies");
+  moviesEl.innerHTML = "";
+  moviesEl.append(...rows);
+}
+
 function fetchMovies(search) {
   const searchUrl = baseApiUrl + search;
   fetchJson(searchUrl)
@@ -44,10 +53,8 @@ function fetchMovies(search) {
         return Promise.all(movieDetails)
       })
       .then(moviesDetails => {
-        const rows = createRowsFromObjects(moviesDetails)
-        const moviesEl = $("#movies");
-        moviesEl.innerHTML = "";
-        moviesEl.append(...rows);
+        moviesList = [...moviesDetails]
+        createHtmlFromList(moviesDetails)
       })
       .catch((error) => {
         console.error(error);
@@ -66,8 +73,24 @@ document.querySelector("#app").innerHTML = `
     <caption>Titre du tableau</caption>
     <thead>
       <tr>
-        <th>Title</th>
-        <th>Year</th>
+        <th>
+          <button 
+            data-sortable=""
+            data-sort="string"
+            data-prop="Title"
+          >
+            Title
+          </button>
+        </th>
+        <th>
+          <button
+            data-sortable=""
+            data-sort="number"
+            data-prop="Year"
+          >
+            Year
+          </button>
+        </th>
         <th>Director</th>
         <th>Actors</th>
         <th>Writers</th>
@@ -80,7 +103,28 @@ document.querySelector("#app").innerHTML = `
   </table>
 `;
 
-$("#search-form").addEventListener("submit", (event) => {
+$('#search-form').addEventListener('submit', (event) => {
   event.preventDefault();
-  fetchMovies($("#search").value);
+  fetchMovies($('#search').value);
 });
+
+$('#filter').addEventListener('input', event => {
+  const filterValue = event.target.value
+  const filteredList = moviesList.filter(
+    movie => Object.values(movie).some(prop => prop.includes(filterValue))
+  )
+  createHtmlFromList(filteredList)
+})
+
+$$('[data-sortable]').forEach(btn => {
+  btn.addEventListener('click', event => {
+    const prop = btn.dataset.prop
+    const sortMethod = btn.dataset.sort
+    const cb = sortMethod === 'number'
+      ? (a, b) => a[prop] - b[prop]
+      : (a, b) => a[prop].localeCompare(b[prop])
+    
+    const sortedList = moviesList.slice().sort(cb)
+    createHtmlFromList(sortedList)
+  })
+})
